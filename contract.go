@@ -8,6 +8,8 @@ import (
 type Instruction struct {
     Op OpCode
     Arg *big.Int
+    Reaches map[int]bool 		// List of program addresses that rely on the output of this instruction
+    ReachedBy []map[int]bool 	// List of program addresses that may provide the value for each operand
 }
 
 func (self Instruction) String() string {
@@ -19,12 +21,12 @@ func (self Instruction) String() string {
 }
 
 type Program struct {
-	Instructions map[int]Instruction
+	Instructions map[int]*Instruction
 }
 
 func NewProgram(bytecode []byte) *Program {
 	program := &Program{
-		Instructions: make(map[int]Instruction),
+		Instructions: make(map[int]*Instruction),
 	}
 
 	for i := 0; i < len(bytecode); i++ {
@@ -40,9 +42,16 @@ func NewProgram(bytecode []byte) *Program {
 				}
 			}
 		}
-		program.Instructions[i] = Instruction{Op: op, Arg: arg}
+		program.Instructions[i] = &Instruction{
+			Op: op,
+			Arg: arg,
+			Reaches: make(map[int]bool),
+			ReachedBy: make([]map[int]bool, op.StackReads()),
+		}
 		i += size
 	}
+
+	program.buildReachings()
 
 	return program
 }
